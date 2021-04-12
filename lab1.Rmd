@@ -1,0 +1,50 @@
+---
+title: "Getting_Data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rvest)
+library(httr)
+library(XML)
+library(knitr)
+
+# функция перебора тегов внутри тегов более высокого уровня
+get_tags <-function(node, selector){
+  raw_data <-html_nodes(node,selector) %>%html_text
+  data_NAs <-ifelse(length(raw_data) == 0, NA, raw_data)
+}
+```
+
+## Загрузка данных
+
+```{r GD}
+
+# Скачиваем данные
+url <- 'https://www.labirint.ru/genres/1850/'
+webpage <- read_html(url)
+
+# отбор названий, цены и издательства
+title <- webpage %>% html_nodes('#catalog .product-title') %>% html_text
+price <- webpage %>% html_nodes('#catalog .price-label .price-val span') %>% html_text
+publisher <- webpage %>% html_nodes('#catalog .product-pubhouse__pubhouse span') %>% html_text
+
+# отбор авторов и старой цены с помощью функции get_tags
+doc <-html_nodes(webpage, '#catalog .col-xs-6')
+author <-sapply(doc, get_tags, selector='.product-author span')
+old_price <-sapply(doc, get_tags, selector='.price-gray')
+
+# удаление пробелов и приведение в числовой формат старой и настоящей цены
+prce <- as.numeric(sapply(price, gsub, pattern=" ", replacement="", fixed = TRUE))
+old_prce <- as.numeric(sapply(old_price, gsub, pattern=" ", replacement="", fixed = TRUE))
+
+# создание фрейма
+DF <- data.frame(Title = title, Author = author,
+                 Publisher = publisher, Price  = price,
+                 Old_Price = old_price)
+# записываем в .csv
+write.csv(DF, file = 'DF_books.csv', row.names = F)
+kable(head(DF))
+```
+
